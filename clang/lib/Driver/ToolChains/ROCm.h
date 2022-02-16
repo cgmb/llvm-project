@@ -130,6 +130,8 @@ private:
   llvm::SmallString<0> findSPACKPackage(const Candidate &Cand,
                                         StringRef PackageName);
 
+  static bool isStdlibIncludePath(StringRef PathString);
+
 public:
   RocmInstallationDetector(const Driver &D, const llvm::Triple &HostTriple,
                            const llvm::opt::ArgList &Args,

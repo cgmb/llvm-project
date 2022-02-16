@@ -477,6 +477,14 @@ void RocmInstallationDetector::print(raw_ostream &OS) const {
        << DetectedVersion << '\n';
 }
 
+/*static*/ bool
+RocmInstallationDetector::isStdlibIncludePath(StringRef PathString) {
+  static const StringRef SystemDirs[] = {"/usr/local/include", "/usr/include"};
+
+  return std::find(std::begin(SystemDirs), std::end(SystemDirs), PathString) !=
+         std::end(SystemDirs);
+}
+
 void RocmInstallationDetector::AddHIPIncludeArgs(const ArgList &DriverArgs,
                                                  ArgStringList &CC1Args) const {
   bool UsesRuntimeWrapper = VersionMajorMinor > llvm::VersionTuple(3, 5);
@@ -510,8 +518,12 @@ void RocmInstallationDetector::AddHIPIncludeArgs(const ArgList &DriverArgs,
     return;
   }
 
-  CC1Args.push_back("-internal-isystem");
-  CC1Args.push_back(DriverArgs.MakeArgString(getIncludePath()));
+  const char *HipIncludePath = DriverArgs.MakeArgString(getIncludePath());
+  if (!isStdlibIncludePath(HipIncludePath) ||
+      DriverArgs.hasArg(options::OPT_nostdlibinc)) {
+    CC1Args.push_back("-internal-isystem");
+    CC1Args.push_back(HipIncludePath);
+  }
   if (UsesRuntimeWrapper)
     CC1Args.append({"-include", "__clang_hip_runtime_wrapper.h"});
 }
