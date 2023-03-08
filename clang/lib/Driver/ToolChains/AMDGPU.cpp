@@ -8,6 +8,7 @@
 
 #include "AMDGPU.h"
 #include "CommonArgs.h"
+#include "llvm/ADT/Triple.h"
 #include "clang/Basic/TargetID.h"
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Distro.h"
@@ -17,6 +18,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/FileUtilities.h"
+#include "llvm/Support/Host.h"
 #include "llvm/Support/LineIterator.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -422,16 +424,21 @@ void RocmInstallationDetector::detectDeviceLibrary() {
     // The possible structures are:
     // - ${ROCM_ROOT}/amdgcn/bitcode/*
     // - ${ROCM_ROOT}/lib/*
+    // - ${ROCM_ROOT}/lib/<multiarch>/amdgcn/bitcode/*
     // - ${ROCM_ROOT}/lib/bitcode/*
-    // so try to detect these layouts.
-    static constexpr std::array<const char *, 2> SubDirsList[] = {
-        {"amdgcn", "bitcode"},
-        {"lib", ""},
-        {"lib", "bitcode"},
+    // so try to detect these layouts. Note that bitcode is associated with the
+    // compiler that built it (not the target architecture).
+    llvm::Triple HostTriple(llvm::sys::getProcessTriple());
+    std::string Multiarch = Twine(HostTriple.getArchName() + "-linux-gnu").str();
+    static const std::array<std::string, 4> SubDirsList[] = {
+        {"amdgcn", "bitcode", "", ""},
+        {"lib", "", "", ""},
+        {"lib", Multiarch, "amdgcn", "bitcode"},
+        {"lib", "bitcode", "", ""},
     };
 
     // Make a path by appending sub-directories to InstallPath.
-    auto MakePath = [&](const llvm::ArrayRef<const char *> &SubDirs) {
+    auto MakePath = [&](const llvm::ArrayRef<std::string> &SubDirs) {
       auto Path = CandidatePath;
       for (auto SubDir : SubDirs)
         llvm::sys::path::append(Path, SubDir);
